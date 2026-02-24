@@ -240,6 +240,7 @@ extension MediaPickerView {
                 config: config
             )
             
+            cropViewController.modalPresentationStyle = .overFullScreen
             cropViewController.delegate = self
             return cropViewController
         }
