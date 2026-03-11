@@ -249,26 +249,28 @@ extension MediaPickerView {
             switch parent.compression {
             case .compressed(let maximumSize, let quality):
                 let resizedImage = image.resized(to: maximumSize)
-                
+
                 guard
                     let data = resizedImage.jpegData(compressionQuality: quality.value)
                 else {
                     assertionFailure("The image has no data or the underlying CGImageRef contains data in an unsupported bitmap format.")
                     throw MediaPickerError.corruptedImage
                 }
-                
+
+                let fileURL = try data.writeToTempDirectory(fileName: "\(UUID().uuidString).jpeg")
+
                 let imageFile = ImageFile(
                     id: UUID().uuidString,
                     image: resizedImage,
                     metadata: FileMetadata(
-                        data: data,
+                        fileURL: fileURL,
                         size: resizedImage.size,
                         uniformType: .jpeg
                     )
                 )
-                
+
                 return File(type: .image(imageFile))
-                
+
             case .original:
                 guard
                     let data = image.jpegData(compressionQuality: 1.0)
@@ -276,17 +278,19 @@ extension MediaPickerView {
                     assertionFailure("The image has no data or the underlying CGImageRef contains data in an unsupported bitmap format.")
                     throw MediaPickerError.corruptedImage
                 }
-                
+
+                let fileURL = try data.writeToTempDirectory(fileName: "\(UUID().uuidString).jpeg")
+
                 let imageFile = ImageFile(
                     id: UUID().uuidString,
                     image: image,
                     metadata: FileMetadata(
-                        data: data,
+                        fileURL: fileURL,
                         size: image.size,
                         uniformType: .jpeg
                     )
                 )
-                
+
                 return File(type: .image(imageFile))
             }
         }
@@ -295,80 +299,77 @@ extension MediaPickerView {
             let asset = AVURLAsset(url: URL(fileURLWithPath: url.path))
             let previewImage = try await asset.previewImage()
             let videoResolution = await asset.resolution()
-            
+
             if videoResolution == nil {
                 print("[FilesPicker] ⚠️ Unable to calculate size for video, will default to image size")
             }
-            
+
             switch parent.compression {
             case .compressed(let maximumSize, let quality):
-                do {
-                    let resizedPreviewImage = previewImage.resized(to: maximumSize)
-                    guard 
-                        let previewImageData = resizedPreviewImage.jpegData(compressionQuality: quality.value)
-                    else {
-                        throw MediaPickerError.corruptedVideoPreviewImage
-                    }
-                    
-                    let previewImageFile = ImageFile(
-                        id: UUID().uuidString,
-                        image: resizedPreviewImage,
-                        metadata: FileMetadata(
-                            data: previewImageData,
-                            size: resizedPreviewImage.size,
-                            uniformType: .jpeg
-                        )
-                    )
-                    
-                    let videoFile = VideoFile(
-                        id: UUID().uuidString,
-                        url: url,
-                        metadata: FileMetadata(
-                            data: try Data(contentsOf: url),
-                            size: videoResolution ?? resizedPreviewImage.size,
-                            uniformType: UTType(filenameExtension: url.pathExtension)
-                        ),
-                        previewImage: previewImageFile
-                    )
-                    
-                    return File(type: .video(videoFile))
-                } catch {
-                    throw error
+                let resizedPreviewImage = previewImage.resized(to: maximumSize)
+
+                guard
+                    let previewImageData = resizedPreviewImage.jpegData(compressionQuality: quality.value)
+                else {
+                    throw MediaPickerError.corruptedVideoPreviewImage
                 }
-                
+
+                let previewImageURL = try previewImageData.writeToTempDirectory(fileName: "\(UUID().uuidString).jpeg")
+
+                let previewImageFile = ImageFile(
+                    id: UUID().uuidString,
+                    image: resizedPreviewImage,
+                    metadata: FileMetadata(
+                        fileURL: previewImageURL,
+                        size: resizedPreviewImage.size,
+                        uniformType: .jpeg
+                    )
+                )
+
+                let videoFile = VideoFile(
+                    id: UUID().uuidString,
+                    url: url,
+                    metadata: FileMetadata(
+                        fileURL: url,
+                        size: videoResolution ?? resizedPreviewImage.size,
+                        uniformType: UTType(filenameExtension: url.pathExtension)
+                    ),
+                    previewImage: previewImageFile
+                )
+
+                return File(type: .video(videoFile))
+
             case .original:
-                do {
-                    guard 
-                        let previewImageData = previewImage.jpegData(compressionQuality: 1.0)
-                    else {
-                        throw MediaPickerError.corruptedVideoPreviewImage
-                    }
-                    
-                    let previewImageFile = ImageFile(
-                        id: UUID().uuidString,
-                        image: previewImage,
-                        metadata: FileMetadata(
-                            data: previewImageData,
-                            size: previewImage.size,
-                            uniformType: .jpeg
-                        )
-                    )
-                    
-                    let videoFile = VideoFile(
-                        id: UUID().uuidString,
-                        url: url,
-                        metadata: FileMetadata(
-                            data: try Data(contentsOf: url),
-                            size: videoResolution ?? previewImage.size,
-                            uniformType: UTType(filenameExtension: url.pathExtension)
-                        ),
-                        previewImage: previewImageFile
-                    )
-                    
-                    return File(type: .video(videoFile))
-                } catch {
-                    throw error
+                guard
+                    let previewImageData = previewImage.jpegData(compressionQuality: 1.0)
+                else {
+                    throw MediaPickerError.corruptedVideoPreviewImage
                 }
+
+                let previewImageURL = try previewImageData.writeToTempDirectory(fileName: "\(UUID().uuidString).jpeg")
+
+                let previewImageFile = ImageFile(
+                    id: UUID().uuidString,
+                    image: previewImage,
+                    metadata: FileMetadata(
+                        fileURL: previewImageURL,
+                        size: previewImage.size,
+                        uniformType: .jpeg
+                    )
+                )
+
+                let videoFile = VideoFile(
+                    id: UUID().uuidString,
+                    url: url,
+                    metadata: FileMetadata(
+                        fileURL: url,
+                        size: videoResolution ?? previewImage.size,
+                        uniformType: UTType(filenameExtension: url.pathExtension)
+                    ),
+                    previewImage: previewImageFile
+                )
+
+                return File(type: .video(videoFile))
             }
         }
         

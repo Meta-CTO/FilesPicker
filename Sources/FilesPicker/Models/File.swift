@@ -2,22 +2,22 @@ import UIKit
 import UniformTypeIdentifiers
 
 public struct FileMetadata: Sendable, Hashable {
-    public let data: Data
+    public let fileURL: URL
     public let size: CGSize?
     public let uniformType: UTType?
-    
+
     public init(
-        data: Data,
+        fileURL: URL,
         size: CGSize?,
         uniformType: UTType?
     ) {
-        self.data = data
+        self.fileURL = fileURL
         self.size = size
         self.uniformType = uniformType
     }
-    
+
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(data)
+        hasher.combine(fileURL)
         hasher.combine(size?.width)
         hasher.combine(size?.height)
         hasher.combine(uniformType)
@@ -93,19 +93,19 @@ public enum FileType: Sendable, Hashable {
         }
     }
     
-    var data: Data {
+    var fileURL: URL {
         switch self {
         case .image(let file):
-            file.metadata.data
-            
+            file.metadata.fileURL
+
         case .video(let file):
-            file.metadata.data
-            
+            file.metadata.fileURL
+
         case .file(let file):
-            file.metadata.data
+            file.metadata.fileURL
         }
     }
-    
+
     var width: Int? {
         switch self {
         case .image(let file):
@@ -164,30 +164,20 @@ public struct File: Identifiable, Sendable, Hashable {
     }
     
     public func getSizeIn(_ type: Data.DataUnit) -> Double {
-        let data = switch self.type {
-        case .image(let file):
-            file.metadata.data
-            
-        case .video(let file):
-            file.metadata.data
-            
-        case .file(let file):
-            file.metadata.data
-        }
-        
-        let size = type.convert(from: Double(data.count))
-        return size
+        let fileURL = self.type.fileURL
+        let byteCount = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
+        return type.convert(from: Double(byteCount))
     }
 }
 
 public extension File {
     var id: String { type.id }
-    
-    var data: Data { type.data }
-    
+
+    var fileURL: URL { type.fileURL }
+
     var width: Int? { type.width }
-    
+
     var height: Int? { type.height }
-    
+
     var uniformType: UTType? { type.uniformType }
 }
